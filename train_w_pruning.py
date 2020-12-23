@@ -37,8 +37,8 @@ if args.dataset == 'ILSVRC':
     args.batch_size *= len(args.gpu_id)
     args.learning_rate *= args.batch_size/256
 
-if len(args.gpu_id) > 1:
-    args.compile = False
+#if len(args.gpu_id) > 1:
+#    args.compile = False
 
 if __name__ == '__main__':
     gpus = tf.config.list_physical_devices('GPU')
