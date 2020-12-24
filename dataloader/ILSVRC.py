@@ -97,12 +97,6 @@ def get_size(path):
     w,h = img.size
     return np.int32(h), np.int32(w)
 
-def path_to_mat(path):
-    dir, file = os.path.split(path.decode("utf-8"))
-    dir = os.path.split(os.path.split(dir)[0])[0]
-    k_path = os.path.join(dir, 'ILSVRC_teacher', 'emb_%s'%file[:-4])
-    return np.load(k_path + '.npy')
-
 def random_resize_crop(image, height, width):
     shape = tf.stack([height, width, 3])
     bbox_begin, bbox_size, distort_bbox = tf.image.sample_distorted_bounding_box(
