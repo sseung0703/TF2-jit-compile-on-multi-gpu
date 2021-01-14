@@ -25,12 +25,12 @@ class Model(tf.keras.Model):
 
 
         if num_class == 1000:
-            self.Layers['conv'] = tcl.Conv2d([7,7], self.net_args['depth'][0], strides = 2, name = 'conv', layertype = 'input')
+            self.Layers['conv'] = tcl.Conv2d([7,7], self.net_args['depth'][0], strides = 2, name = 'conv')
             self.Layers['bn']   = tcl.BatchNorm(name = 'bn')
             self.maxpool_3x3 = tf.keras.layers.MaxPool2D((3,3), strides = 2, padding = 'SAME')
 
         else:
-            self.Layers['conv'] = tcl.Conv2d([3,3], self.net_args['depth'][0], name = 'conv', layertype = 'input')
+            self.Layers['conv'] = tcl.Conv2d([3,3], self.net_args['depth'][0], name = 'conv')
             self.Layers['bn']   = tcl.BatchNorm(name = 'bn')
 
         self.expansion = 1 if self.num_layers in {18, 56} else 4
