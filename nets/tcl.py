@@ -266,21 +266,29 @@ class BatchNorm(tf.keras.layers.Layer):
     def EMA(self, variable, value):
         update_delta = (variable - value) * (1-self.alpha)
         variable.assign_sub(update_delta)
-        
+
+    def update(self):
+        self.EMA(self.moving_mean, self.mean)
+        self.EMA(self.moving_variance, self.var)
+
     def call(self, input, training=None):
         if training:
             mean, var = tf.nn.moments(input, list(range(len(input.shape)-1)), keepdims=True)
-            if not(hasattr(self, 'out_depth')):
-                self.EMA(self.moving_mean, mean)
-                self.EMA(self.moving_variance, var)
+            self.mean, self.var = mean, var
         else:
             mean = self.moving_mean
             var = self.moving_variance
-            
+
         gamma, beta = self.gamma, self.beta
         Do = self.moving_mean.shape[-1]
-        if hasattr(self, 'out_depth'):
-            Do = tf.math.ceil(self.ori_shape*self.out_depth)
+        if hasattr(self, 'gate'):
+            gamma = self.gate
+            if hasattr(self, 'out_depth'):
+                Do = tf.math.ceil(self.ori_shape*self.out_depth)
+                out_mask = tf.cast(tf.less(self.out_mask, Do),tf.float32)
+                out_mask = tf.reshape(out_mask, [1]*(len(input.shape)-1)+[-1])
+                gamma = gamma * out_mask
+            beta = beta * gamma
 
         bn = tf.nn.batch_normalization(input, mean, var, offset = beta, scale = gamma, variance_epsilon = self.epsilon)
 
