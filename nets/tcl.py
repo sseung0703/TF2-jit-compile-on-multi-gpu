@@ -18,8 +18,6 @@ class Conv2d(tf.keras.layers.Layer):
                  activation_fn = None,
                  name = 'conv',
                  trainable = True,
-                 layertype = 'mid',
-                 keep_feat = False,
                  **kwargs):
         super(Conv2d, self).__init__(name = name, trainable = trainable, **kwargs)
         
@@ -34,9 +32,6 @@ class Conv2d(tf.keras.layers.Layer):
         self.biases_initializer = biases_initializer
         
         self.activation_fn = activation_fn
-
-        self.type = layertype
-        self.keep_feat = keep_feat
         
     def build(self, input_shape):
         super(Conv2d, self).build(input_shape)
@@ -53,12 +48,6 @@ class Conv2d(tf.keras.layers.Layer):
 
     def call(self, input):
         kernel = self.kernel
-        kh,kw,Di,Do = kernel.shape
-
-        if hasattr(self, 'in_depth'):
-            Di = tf.math.ceil(self.ori_shape[2]*self.in_depth)
-        if hasattr(self, 'out_depth'):
-            Do = tf.math.ceil(self.ori_shape[3]*self.out_depth)
 
         conv = tf.nn.conv2d(input, kernel, self.strides, self.padding,
                             dilations=self.dilations, name=None)
@@ -68,14 +57,6 @@ class Conv2d(tf.keras.layers.Layer):
         if self.activation_fn:
             conv = self.activation_fn(conv)
 
-        H,W = conv.shape[1:3]
-        self.params = kh*kw*Di*Do
-        self.flops  = H*W*self.params
-        
-        if self.use_biases:
-            self.params += Do
-        if self.keep_feat:
-            self.feat = conv
         return conv
 
 class DepthwiseConv2d(tf.keras.layers.Layer):
@@ -87,8 +68,6 @@ class DepthwiseConv2d(tf.keras.layers.Layer):
                  activation_fn = None,
                  name = 'conv',
                  trainable = True,
-                 layertype = 'mid',
-                 keep_feat = False,
                  **kwargs):
         super(DepthwiseConv2d, self).__init__(name = name, trainable = trainable, **kwargs)
         
@@ -104,10 +83,6 @@ class DepthwiseConv2d(tf.keras.layers.Layer):
         
         self.activation_fn = activation_fn
 
-        self.type = layertype
-        self.keep_feat = keep_feat
-        
-        
     def build(self, input_shape):
         super(DepthwiseConv2d, self).build(input_shape)
         self.kernel = self.add_weight(name  = 'kernel', 
@@ -123,26 +98,11 @@ class DepthwiseConv2d(tf.keras.layers.Layer):
 
     def call(self, input):
         kernel = self.kernel
-        kh,kw,Di,Do = kernel.shape
-
-        if hasattr(self, 'in_depth'):
-            Di = tf.math.ceil(self.ori_shape[2]*self.in_depth)
-
         conv = tf.nn.depthwise_conv2d(input, kernel, strides = self.strides, padding = self.padding, dilations=self.dilations)
         if self.use_biases:
             conv += self.biases
         if self.activation_fn:
             conv = self.activation_fn(conv)
-
-        H,W = conv.shape[1:3]
-
-        self.params = kh*kw*Di*Do
-        self.flops  = H*W*self.params
-        
-        if self.use_biases:
-            self.params += Do
-        if self.keep_feat:
-            self.feat = conv
         return conv
 
 class FC(tf.keras.layers.Layer):
@@ -153,7 +113,6 @@ class FC(tf.keras.layers.Layer):
                  biases_initializer  = tf.keras.initializers.Zeros(),
                  activation_fn = None,
                  name = 'fc',
-                 keep_feat = False,
                  trainable = True, **kwargs):
         super(FC, self).__init__(name = name, trainable = trainable, **kwargs)
         self.num_outputs = num_outputs
@@ -163,8 +122,6 @@ class FC(tf.keras.layers.Layer):
         self.biases_initializer = biases_initializer
         
         self.activation_fn = activation_fn
-        
-        self.keep_feat = keep_feat
         
     def build(self, input_shape):
         super(FC, self).build(input_shape)
@@ -180,10 +137,6 @@ class FC(tf.keras.layers.Layer):
         self.ori_shape = self.kernel.shape
     def call(self, input):
         kernel = self.kernel
-        Di,Do = kernel.shape
-
-        if hasattr(self, 'in_depth'):
-            Di = tf.math.ceil(self.ori_shape[0]*self.in_depth)
 
         fc = tf.matmul(input, kernel)
         if self.use_biases:
@@ -191,16 +144,6 @@ class FC(tf.keras.layers.Layer):
         if self.activation_fn:
             fc = self.activation_fn(fc)
 
-        self.params = Di*Do         
-        self.flops  = self.params
-        for n in fc.shape[1:-1]:
-            self.flops *= n 
-        
-        if self.use_biases:
-            self.params += Do
-        if self.keep_feat:
-            self.in_feat = input
-            self.feat = fc
         return fc
 
 class BatchNorm(tf.keras.layers.Layer):
@@ -213,7 +156,6 @@ class BatchNorm(tf.keras.layers.Layer):
                        activation_fn = None,
                        name = 'bn',
                        trainable = True,
-                       keep_feat = False,
                        **kwargs):
         super(BatchNorm, self).__init__(name = name, trainable = trainable, **kwargs)
         if param_initializers == None:
@@ -233,7 +175,6 @@ class BatchNorm(tf.keras.layers.Layer):
         self.alpha = alpha
         self.epsilon = epsilon
         self.activation_fn = activation_fn
-        self.keep_feat = keep_feat
 
     def build(self, input_shape):
         super(BatchNorm, self).build(input_shape)
@@ -281,25 +222,10 @@ class BatchNorm(tf.keras.layers.Layer):
             var = self.moving_variance
 
         gamma, beta = self.gamma, self.beta
-        Do = self.moving_mean.shape[-1]
-        if hasattr(self, 'gate'):
-            gamma = self.gate
-            if hasattr(self, 'out_depth'):
-                Do = tf.math.ceil(self.ori_shape*self.out_depth)
-                out_mask = tf.cast(tf.less(self.out_mask, Do),tf.float32)
-                out_mask = tf.reshape(out_mask, [1]*(len(input.shape)-1)+[-1])
-                gamma = gamma * out_mask
-            beta = beta * gamma
-
         bn = tf.nn.batch_normalization(input, mean, var, offset = beta, scale = gamma, variance_epsilon = self.epsilon)
 
         if self.activation_fn:
             bn = self.activation_fn(bn)
-        self.params = Do * (2 + self.scale + self.center)
-        self.flops  = self.params
-        for n in bn.shape[1:-1]:
-            self.flops *= n
-        if self.keep_feat:
-            self.feat = bn
+
         return bn
 
