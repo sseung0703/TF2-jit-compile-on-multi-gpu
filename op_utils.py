@@ -14,16 +14,17 @@ def Optimizer(args, model, strategy):
             pred = model(images, training = True)
             total_loss = loss_object(labels, pred)/args.batch_size
         gradients = tape.gradient(total_loss, model.trainable_variables)
-        return total_loss, pred, gradients
+        update_vars = [model.Layers[k].update_var if hasattr(model.Layers[k], 'update_var') else None for k in model.Layers ]
+        return total_loss, pred, gradients, update_vars
 
     def train_step(images, labels):
-        total_loss, pred, gradients = compiled_step(images, labels)
+        total_loss, pred, gradients, update_vars = compiled_step(images, labels)
         if args.weight_decay > 0.:
             gradients = [g+v*args.weight_decay for g,v in zip(gradients, model.trainable_variables)]
         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-        for k in model.Layers:
+        for k, v in zip(model.Layers, update_vars):
             if hasattr(model.Layers[k], 'update'):
-                model.Layers[k].update
+                model.Layers[k].update(v)
 
         train_loss.update_state(total_loss)
         train_accuracy.update_state(labels, pred)
