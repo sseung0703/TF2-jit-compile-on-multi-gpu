@@ -34,16 +34,16 @@ class Evaluation:
         self.test_loss = tf.keras.metrics.Mean(name='test_loss')
         self.test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
 
-        @tf.function(experimental_compile=args.compile)
+        @tf.function(jit_compile=args.compile)
         def eval_step(images, labels, training):
             pred = model(images, training = training)
             loss = loss_object(labels, pred)/args.val_batch_size
-            self.test_loss.update_state(loss)
-            self.test_accuracy.update_state(labels, pred)
 
-        @tf.function(experimental_compile = args.compile)
+        @tf.function
         def eval_step_dist(images, labels, training):
             strategy.run(eval_step, args=(images, labels, training))
+            self.test_loss.update_state(loss)
+            self.test_accuracy.update_state(labels, pred)
 
         self.dataset = dataset
         self.step = eval_step_dist
