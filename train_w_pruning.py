@@ -26,7 +26,7 @@ parser.add_argument("--train_epoch", default=100, type=int)
 
 parser.add_argument("--gpu_id", default= [0], type=int, nargs = '+')
 parser.add_argument("--do_log", default=200, type=int)
-parser.add_argument("--compile", default=True, action = 'store_true')
+parser.add_argument("--compile", default=False, action = 'store_true')
 args = parser.parse_args()
 
 args.home_path = os.path.dirname(os.path.abspath(__file__))
@@ -36,9 +36,6 @@ if args.dataset == 'ILSVRC':
     args.weight_decay /= len(args.gpu_id)
     args.batch_size *= len(args.gpu_id)
     args.learning_rate *= args.batch_size/256
-
-#if len(args.gpu_id) > 1:
-#    args.compile = False
 
 if __name__ == '__main__':
     gpus = tf.config.list_physical_devices('GPU')
@@ -111,10 +108,3 @@ if __name__ == '__main__':
         total_train_time += fine_tuning_time
         args.total_train_time = total_train_time
         print ('total_time: %f'%total_train_time)
-
-        p, f = utils.check_complexity(model, args)
-        args.FLOPS = f
-        args.params = p
-        args.test_acc = test_acc*100
-        with open(os.path.join(args.train_path, 'arguments.txt'), 'w') as f:
-            json.dump(args.__dict__, f, indent=2)
