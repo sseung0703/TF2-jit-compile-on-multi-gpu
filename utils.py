@@ -6,7 +6,6 @@ import tensorflow as tf
 tf.debugging.set_log_device_placement(False)
 
 from nets import ResNet
-import asyncio
 
 def scheduler(args, epoch):
     lr = args.learning_rate
@@ -133,21 +132,3 @@ def save_model(args, model, name):
             params[v.name[len(model.name)+1:]] = v.numpy()
     with open(os.path.join(args.train_path, name + '.pkl'), 'wb') as f:
         pickle.dump(params, f)
-
-def check_complexity(model, args):
-    model(np.zeros([1]+args.input_size, dtype=np.float32), training = False)
-    total_params = []
-    total_flops = []
-    for k in model.Layers.keys():
-        layer = model.Layers[k]
-        if hasattr(layer, 'params'):
-            p = layer.params
-            if isinstance(p, tf.Tensor):
-                p = p.numpy()
-            total_params.append(p)
-        if hasattr(layer, 'flops'):
-            f = layer.flops
-            if isinstance(f, tf.Tensor):
-                f = f.numpy()
-            total_flops.append(f)
-    return sum(total_params), sum(total_flops)
