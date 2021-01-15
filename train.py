@@ -1,8 +1,7 @@
-import os, glob, time, argparse, json, shutil, pickle
+import os, time, argparse
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import numpy as np
-import scipy.io as sio
 import tensorflow as tf
 tf.debugging.set_log_device_placement(False)
 
@@ -10,23 +9,22 @@ from dataloader import ILSVRC, CIFAR
 import op_utils, utils
 
 parser = argparse.ArgumentParser(description='')
+parser.add_argument("--train_path", default="test", type=str, help = 'path to log')
+parser.add_argument("--data_path", default="E:/ILSVRC2012", type=str, help = 'home path for ILSVRC dataset')
+parser.add_argument("--arch", default='ResNet-50', type=str, help = 'network architecture. currently ResNet is only available')
+parser.add_argument("--dataset", default='ILSVRC', type=str, help = 'ILSVRC or CIFAR{10,100}')
 
-parser.add_argument("--train_path", default="test", type=str, help = 'abc')
-parser.add_argument("--data_path", default="/home/cvip/nas/ssd/ILSVRC2012", type=str)
-parser.add_argument("--arch", default='ResNet-56', type=str)
-parser.add_argument("--dataset", default='CIFAR10', type=str)
+parser.add_argument("--learning_rate", default = 1e-1, type=float, help = 'initial learning rate')
+parser.add_argument("--decay_points", default = [.3, .6, .9], type=float, nargs = '+', help = 'learning rate decay point')
+parser.add_argument("--decay_rate", default=.1, type=float, help = 'rate to decay at each decay points')
+parser.add_argument("--weight_decay", default=1e-4, type=float, help = 'decay parameter for l2 regularizer')
+parser.add_argument("--batch_size", default = 256, type=int, help = 'training batch size')
+parser.add_argument("--val_batch_size", default=256, type=int, help = 'validation batch size')
+parser.add_argument("--train_epoch", default=100, type=int, help = 'total training epoch')
 
-parser.add_argument("--learning_rate", default = 1e-1, type=float)
-parser.add_argument("--decay_points", default = [.3, .6, .9], type=float, nargs = '+')
-parser.add_argument("--decay_rate", default=.1, type=float)
-parser.add_argument("--weight_decay", default=1e-4, type=float)
-parser.add_argument("--batch_size", default = 64, type=int)
-parser.add_argument("--val_batch_size", default=256, type=int)
-parser.add_argument("--train_epoch", default=100, type=int)
-
-parser.add_argument("--gpu_id", default= [0], type=int, nargs = '+')
-parser.add_argument("--do_log", default=200, type=int)
-parser.add_argument("--compile", default=False, action = 'store_true')
+parser.add_argument("--gpu_id", default= [0], type=int, nargs = '+', help = 'denote which gpus are used')
+parser.add_argument("--do_log", default=200, type=int, help = 'logging period')
+parser.add_argument("--compile", default=False, action = 'store_true', help = 'denote use compile or not. True is recommended in this repo')
 args = parser.parse_args()
 
 args.home_path = os.path.dirname(os.path.abspath(__file__))
@@ -34,7 +32,6 @@ args.decay_points = [int(dp*args.train_epoch) if dp < 1 else int(dp) for dp in a
 
 if args.dataset == 'ILSVRC':
     args.weight_decay /= len(args.gpu_id)
-    args.batch_size *= len(args.gpu_id)
     args.learning_rate *= args.batch_size/256
 
 if __name__ == '__main__':
@@ -67,12 +64,10 @@ if __name__ == '__main__':
             tic = time.time()
             for step, data in enumerate(datasets['train']):
                 epoch = step//datasets['train_len']
-                lr = utils.scheduler(args, epoch)
-                if epoch in args.decay_points:
-                    optimizer.learning_rate = lr
+                lr = utils.scheduler(args, optimizer, epoch)
                 train_step(*data)
-                step += 1
 
+                step += 1
                 if step % args.do_log == 0:
                     template = 'Global step {0:5d}: loss = {1:0.4f} ({2:1.3f} sec/step)'
                     train_time = time.time() - tic
@@ -100,11 +95,3 @@ if __name__ == '__main__':
                     tic += time.time() - tic_
 
         utils.save_model(args, model, 'trained_params')
-        train_time = time.time() - tic
-        fine_tuning_time += train_time
-        args.fine_tuning_time = fine_tuning_time
-        print ('fine_tuning_time: %f'%fine_tuning_time)
-
-        total_train_time += fine_tuning_time
-        args.total_train_time = total_train_time
-        print ('total_time: %f'%total_train_time)

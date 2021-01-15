@@ -7,11 +7,13 @@ tf.debugging.set_log_device_placement(False)
 
 from nets import ResNet
 
-def scheduler(args, epoch):
+def scheduler(args, optimizer, epoch):
     lr = args.learning_rate
     for dp in args.decay_points:
         if epoch >= dp:
             lr *= args.decay_rate
+    if epoch in args.decay_points:
+        optimizer.learning_rate = lr
     return lr
 
 def save_code_and_augments(args):
@@ -87,7 +89,6 @@ def load_model(args, num_class, trained_param = None):
                 param_initializers = {'moving_mean' : tf.constant_initializer(moving_mean),
                                       'moving_variance': tf.constant_initializer(moving_variance)}
                 n += 2
-    
                 if layer.scale:
                     param_initializers['gamma'] = tf.constant_initializer(trained[layer.name + '/gamma:0'])
                     n += 1

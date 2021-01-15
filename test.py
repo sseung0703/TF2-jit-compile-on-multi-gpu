@@ -1,26 +1,24 @@
-import os, pickle
+import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-import numpy as np
-import argparse, time
+import argparse
 import tensorflow as tf
 
 from dataloader import ILSVRC, CIFAR
 import utils
-from nets import ResNet
 
 home_path = os.path.dirname(os.path.abspath(__file__))
 parser = argparse.ArgumentParser(description='')
 
-parser.add_argument("--arch", default='ResNet-18', type=str)
-parser.add_argument("--dataset", default='CIFAR10', type=str)
+parser.add_argument("--arch", default='ResNet-50', type=str)
+parser.add_argument("--dataset", default='ILSVRC', type=str)
 
-parser.add_argument("--val_batch_size", default=64, type=int)
+parser.add_argument("--val_batch_size", default=256, type=int)
 parser.add_argument("--trained_param", default = 'res50_ilsvrc.pkl',type=str)
 parser.add_argument("--data_path", default = '/home/cvip/nas/ssd/ILSVRC2012',type=str)
 
 parser.add_argument("--gpu_id", default= [0], type=int, nargs = '+')
-parser.add_argument("--compile", default = True, action = 'store_true')
+parser.add_argument("--compile", default = False, action = 'store_true')
 
 args = parser.parse_args()
 
@@ -47,15 +45,18 @@ if __name__ == '__main__':
         top5_accuracy = tf.keras.metrics.SparseTopKCategoricalAccuracy(k=5, name='top5_accuracy')
 
         @tf.function(experimental_compile = args.compile)
+        def compiled_step(images):
+            return model(images, training = False)
+
         def test_step(images, labels):
-            pred = model(images, training = False)
+            pred = compiled_step(images, labels)
             top1_accuracy.update_state(labels, pred)
             top5_accuracy.update_state(labels, pred)
 
-        @tf.function(experimental_compile = args.compile)
+        @tf.function
         def test_step_dist(images, labels):
             strategy.run(test_step, args=(images, labels))
-
+            
         for i, (test_images, test_labels) in enumerate(datasets['test']):
             test_step_dist(test_images, test_labels)
 
@@ -64,5 +65,3 @@ if __name__ == '__main__':
         top1_accuracy.reset_states()
         top5_accuracy.reset_states()
         print ('Test ACC. Top-1: %.4f, Top-5: %.4f'%(top1_acc, top5_acc))
-        p, f = utils.check_complexity(model, args)
-        print (p/1e6, f/1e9)

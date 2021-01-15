@@ -1,5 +1,4 @@
 import tensorflow as tf
-import numpy as np
 
 def Optimizer(args, model, strategy):
     loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction = tf.keras.losses.Reduction.SUM)
@@ -29,7 +28,7 @@ def Optimizer(args, model, strategy):
         train_loss.update_state(total_loss)
         train_accuracy.update_state(labels, pred)
 
-    @tf.function()
+    @tf.function
     def train_step_dist(image, labels):
         strategy.run(train_step, args= (image, labels))
 
