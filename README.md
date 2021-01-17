@@ -19,4 +19,14 @@ python train.py --compile --gpu_id {} --dataset CIFAR{10,100} --train_path /path
 ```
 
 ## Experimental results
-- I will share my results soon :).
+- I used four 1080ti.
+- Jit compiling gives a 40% speedup for training time.
+
+   \       | Accuracy | Training time
+------------| ------------- | -------------
+Distributed only     | 75.83 | 94.61
+Distributed with Jit     | 75.57 | 56.98
+
+<p align="center">
+<img width="900" alt="Training plot of ResNet-56 on ILSVRC-2012" src="https://user-images.githubusercontent.com/26036843/104848882-1c1b9400-592a-11eb-82ea-abb20bd339ba.png">
+</p>
